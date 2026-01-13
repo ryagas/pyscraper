@@ -1,11 +1,13 @@
 from enum import Enum
 
 
-class Bender(Enum):
-    AIR_BENDER = "air"
-    WATER_BENDER = "water"
-    EARTH_BENDER = "earth"
-    FIRE_BENDER = "fire"
+class TextType(Enum):
+    PLAIN = "text"
+    BOLD = "bold"
+    ITALIC = "italic"
+    CODE = "code"
+    LINK = "link"
+    IMAGE = "image"
 
 
 class TextNode:
@@ -22,4 +24,4 @@ class TextNode:
         )
 
     def __repr__(self):
-        return f'TextNode("{self.text}", {self.text_type}, "{self.url}")'
+        return f'TextNode("{self.text}", {self.text_type}, {f"{self.url}" if self.url else None})'
