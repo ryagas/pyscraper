@@ -1,6 +1,6 @@
 import unittest
 from textnode import TextNode, TextType
-from utils import split_nodes_delimiter
+from utils import split_nodes_delimiter, split_nodes_image
 
 
 class TestSplitNodesDelimiter(unittest.TestCase):
@@ -104,6 +104,64 @@ class TestSplitNodesDelimiter(unittest.TestCase):
 
         self.assertEqual(result, expected)
         self.assertEqual(len(result), 1)
+
+
+class TestSplitNodesImage(unittest.TestCase):
+    def test_case_image_middle_of_text(self):
+        # Arrange
+        input_node = TextNode(
+            "Text before ![example image](https://example.com/example.gif) text after",
+            TextType.TEXT,
+        )
+        old_nodes = [input_node]
+
+        # Act
+        result = split_nodes_image(old_nodes)  # or split_nodes_link
+
+        # Assert
+        expected_length = 3
+        expected = [
+            TextNode("Text before ", TextType.TEXT),
+            TextNode(
+                "example image", TextType.IMAGE, "https://example.com/example.gif"
+            ),
+            TextNode(" text after", TextType.TEXT),
+        ]
+        self.assertEqual(result, expected)
+        self.assertEqual(len(result), expected_length)
+
+        # Optionally verify specific node properties
+        self.assertEqual(result[0].text_type, TextType.TEXT)
+        self.assertEqual(result[1].text_type, TextType.IMAGE)
+        self.assertEqual(result[1].url, "https://example.com/example.gif")
+        self.assertEqual(result[2].text_type, TextType.TEXT)
+
+    def test_case_image_beginning_of_text(self):
+        # Arrange
+        input_node = TextNode(
+            "![example image](https://example.com/example.gif) text after",
+            TextType.TEXT,
+        )
+        old_nodes = [input_node]
+
+        # Act
+        result = split_nodes_image(old_nodes)
+
+        # Assert
+        expected_length = 2
+        expected = [
+            TextNode(
+                "example image", TextType.IMAGE, "https://example.com/example.gif"
+            ),
+            TextNode(" text after", TextType.TEXT),
+        ]
+        self.assertEqual(result, expected)
+        self.assertEqual(len(result), expected_length)
+
+        # Optionally verify specific node properties
+        self.assertEqual(result[0].text_type, TextType.IMAGE)
+        self.assertEqual(result[0].url, "https://example.com/example.gif")
+        self.assertEqual(result[1].text_type, TextType.TEXT)
 
 
 if __name__ == "__main__":

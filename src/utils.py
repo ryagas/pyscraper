@@ -1,3 +1,4 @@
+import re
 from textnode import TextNode, TextType
 from htmlnode import LeafNode
 
@@ -47,37 +48,99 @@ def split_text_by_delimiter(text, delimiter, text_type):
         List of TextNode objects
     """
     result_nodes = []
-    
+
     # Validate delimiter pairing
     delimiter_count = text.count(delimiter)
     if delimiter_count % 2 != 0:
         raise ValueError("Invalid markdown: unclosed delimiter")
-    
+
     # If no delimiters, return original text as-is
     if delimiter_count == 0:
         return [TextNode(text, TextType.TEXT)]
-    
+
     # Split the text by delimiter
     sections = text.split(delimiter)
-    
+
     # Process sections: alternating between TEXT and the new text_type
     is_inside_delimiter = False
-    
+
     for section in sections:
         if section == "":
             # Toggle state even for empty sections
             is_inside_delimiter = not is_inside_delimiter
             continue
-        
+
         if is_inside_delimiter:
             # Text between delimiters gets the new text_type
             result_nodes.append(TextNode(section, text_type))
         else:
             # Text outside delimiters remains TEXT
             result_nodes.append(TextNode(section, TextType.TEXT))
-        
+
         # Toggle the state
         is_inside_delimiter = not is_inside_delimiter
-    
+
     return result_nodes
 
+
+def extract_markdown_images(text):
+    matches = re.findall(r"!\[([^\]]*)\]\(([^\)]*)\)", text)
+    return matches
+
+
+def extract_markdown_links(text):
+    matches = re.findall(r"(?<!!)\[([^\[\]]*)\]\(([^\(\)]*)\)", text)
+    return matches
+
+
+def split_nodes_image(old_nodes):
+    new_nodes = []
+
+    for node in old_nodes:
+        if node.text_type is not TextType.TEXT:
+            new_nodes.extend([node])
+            continue
+        image_list = extract_markdown_images(node.text)
+        if len(image_list) == 0:
+            new_nodes.extend([node])
+            continue
+        first_image = image_list[0]
+        image_markdown = f"![{first_image[0]}]({first_image[1]})"
+
+        parts = node.text.split(image_markdown, 1)
+
+        if parts[0]:
+            new_nodes.extend([TextNode(parts[0], TextType.TEXT)])
+
+        new_nodes.extend([TextNode(first_image[0], TextType.IMAGE, first_image[1])])
+
+        if parts[1]:
+            results = split_nodes_image([TextNode(parts[1], TextType.TEXT)])
+            new_nodes.extend(results)
+    return new_nodes
+
+
+def split_nodes_link(old_nodes):
+    new_nodes = []
+
+    for node in old_nodes:
+        if node.text_type is not TextType.TEXT:
+            new_nodes.extend([node])
+            continue
+        link_list = extract_markdown_links(node.text)
+        if len(link_list) == 0:
+            new_nodes.extend([node])
+            continue
+        first_link = link_list[0]
+        link_markdown = f"[{first_link[0]}]({first_link[1]})"
+        parts = node.text.split(link_markdown, 1)
+
+        if parts[0]:
+            new_nodes.extend([TextNode(parts[0], TextType.TEXT)])
+
+        new_nodes.extend([TextNode(first_link[0], TextType.LINK, first_link[1])])
+
+        if parts[1]:
+            results = split_nodes_link([TextNode(parts[1], TextType.TEXT)])
+            new_nodes.extend(results)
+    return new_nodes
