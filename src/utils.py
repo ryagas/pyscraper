@@ -160,3 +160,21 @@ def text_to_textnodes(text):
     nodes = split_nodes_link(nodes)
 
     return nodes
+
+
+def markdown_to_blocks(markdown):
+    if not markdown:
+        return []
+
+    # blocks = SPLIT markdown by "\n\n"
+    blocks = markdown.split("\n\n")
+
+    # remove leading/trailing whitespace
+    cleaned_blocks = []
+    for block in blocks:
+        trimmed_block = block.strip()
+
+        if trimmed_block:
+            cleaned_blocks.extend([trimmed_block])
+
+    return cleaned_blocks
