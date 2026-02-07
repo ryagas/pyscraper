@@ -1,6 +1,55 @@
+from enum import Enum
 import re
 from textnode import TextNode, TextType
 from htmlnode import LeafNode
+
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
+
+
+def block_to_block_type(block):
+    lines = block.split("\n")
+
+    if block.startswith("```\n") and block.rstrip().endswith("```"):
+        return BlockType.CODE
+
+    if re.match(r"^#{1,6} ", block):
+        return BlockType.HEADING
+
+    all_lines_start_with_quote = True
+    for line in lines:
+        if not (line.startswith(">")):
+            all_lines_start_with_quote = False
+            break
+    if all_lines_start_with_quote:
+        return BlockType.QUOTE
+
+    all_lines_are_unordered = True
+    for line in lines:
+        if not (line.startswith("* ") or line.startswith("- ")):
+            all_lines_are_unordered = False
+            break
+    if all_lines_are_unordered:
+        return BlockType.UNORDERED_LIST
+
+    all_lines_are_ordered = True
+    expected_number = 1
+    for line in lines:
+        expected_prefix = str(expected_number) + ". "
+        if not (line.startswith(expected_prefix)):
+            all_lines_are_ordered = False
+            break
+        expected_number += 1
+    if all_lines_are_ordered:
+        return BlockType.ORDERED_LIST
+
+    return BlockType.PARAGRAPH
 
 
 def text_node_to_html_node(text_node: TextNode):
