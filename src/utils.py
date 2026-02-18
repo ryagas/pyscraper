@@ -1,7 +1,7 @@
 from enum import Enum
 import re
 from textnode import TextNode, TextType
-from htmlnode import LeafNode
+from htmlnode import LeafNode, ParentNode
 
 
 class BlockType(Enum):
@@ -227,3 +227,197 @@ def markdown_to_blocks(markdown):
             cleaned_blocks.extend([trimmed_block])
 
     return cleaned_blocks
+
+
+def strip_numbered_prefix(block):
+    return re.sub(r"^\d+\.\s*", "", block)
+
+
+def strip_list_prefix(line):
+    if line.startswith("* "):
+        return line[2:]
+    elif line.startswith("- "):
+        return line[2:]
+    return line
+
+
+def join_lines_without_prefix(lines, prefix):
+    stripped_lines = []
+    for line in lines:
+        if line.startswith(prefix):
+            # Remove the prefix and any immediately following whitespace
+            stripped_lines.append(line[len(prefix) :].lstrip())
+        else:
+            # If line doesn't have the prefix, keep it as is
+            stripped_lines.append(line)
+
+    return " ".join(stripped_lines)
+
+
+def split_into_lines(block):
+    return block.splitlines()
+
+
+def strip_code_delimiters(block):
+    result = block
+    # Remove leading ```
+    if result.startswith("```"):
+        result = result[3:]
+
+    # Remove trailing ```
+    if result.endswith("```"):
+        result = result[:-3]
+
+    return result
+
+
+def strip_heading_prefix(block):
+    i = 0
+    while i < len(block) and block[i] == "#":
+        i += 1
+    # Skip the space after the hashes
+    if i < len(block) and block[i] == " ":
+        i += 1
+    return block[i:]
+
+
+def count_leading_hashes(block):
+    count = 0
+    for ch in block:
+        if ch == "#":
+            count += 1
+        else:
+            break
+    return count
+
+
+def text_to_child_nodes(text):
+    # Convert text with inline markdown to list of HTMLNodes
+    text_nodes = text_to_textnodes(text)
+    children = []
+    for text_node in text_nodes:
+        html_node = text_node_to_html_node(text_node)
+        children.append(html_node)
+    return children
+
+
+def paragraph_to_html_node(block):
+    # Process inline markdown in paragraph
+    children = text_to_child_nodes(block)
+    return ParentNode("p", children)
+
+
+def heading_to_html_node(block):
+    # Extract heading level (count # chars)
+    level = count_leading_hashes(block)
+
+    # Remove "### " prefix to get text
+    text = strip_heading_prefix(block)
+
+    # Process inline markdown
+    children = text_to_child_nodes(text)
+
+    # Return h1-h6 tag
+    return ParentNode(f"h{level}", children)
+
+
+def code_to_html_node(block):
+    # Remove ``` delimiters
+    code_text = strip_code_delimiters(block)
+
+    # Code blocks should not process inline markdown
+    # Just wrap text in code tag, then in pre tag
+    code_node = LeafNode("code", code_text)
+    return ParentNode("pre", [code_node])
+
+
+def quote_to_html_node(block):
+    # Split into lines
+    lines = split_into_lines(block)
+
+    # Strip '>' from each line and join
+    text = join_lines_without_prefix(lines, ">")
+
+    # Process inline markdown in quote
+    children = text_to_child_nodes(text)
+
+    return ParentNode("blockquote", children)
+
+
+def unordered_list_to_html_node(block):
+    # Split into lines
+    lines = split_into_lines(block)
+
+    # Create list items
+    list_items = []
+    for line in lines:
+        # Strip "* " or "- " prefix
+        text = strip_list_prefix(line)
+
+        # Process inline markdown in list item
+        children = text_to_child_nodes(text)
+
+        li_node = ParentNode("li", children)
+        list_items.append(li_node)
+
+    return ParentNode("ul", list_items)
+
+
+def ordered_list_to_html_node(block):
+    # Split into lines
+    lines = split_into_lines(block)
+
+    # Create list items
+    list_items = []
+    for line in lines:
+        # Strip "1. ", "2. ", etc. prefix
+        text = strip_numbered_prefix(line)
+
+        # Process inline markdown in list item
+        children = text_to_child_nodes(text)
+
+        li_node = ParentNode("li", children)
+        list_items.append(li_node)
+
+    return ParentNode("ol", list_items)
+
+
+def markdown_to_html_node(markdown):
+    """
+    Converts a markdown document into a single parent HTMLNode.
+
+    Args:
+        markdown: String containing markdown document
+
+    Returns:
+        ParentNode with tag='div' containing child nodes for each block
+    """
+    # Split markdown into blocks
+    blocks = markdown_to_blocks(markdown)
+
+    # Create list to hold child nodes for each block
+    block_children = []
+
+    # Process each block
+    for block in blocks:
+        # Determine block type
+        block_type = block_to_block_type(block)
+
+        # Convert block to HTMLNode based on type
+        if block_type == BlockType.PARAGRAPH:
+            child_node = paragraph_to_html_node(block)
+        elif block_type == BlockType.HEADING:
+            child_node = heading_to_html_node(block)
+        elif block_type == BlockType.CODE:
+            child_node = code_to_html_node(block)
+        elif block_type == BlockType.QUOTE:
+            child_node = quote_to_html_node(block)
+        elif block_type == BlockType.UNORDERED_LIST:
+            child_node = unordered_list_to_html_node(block)
+        elif block_type == BlockType.ORDERED_LIST:
+            child_node = ordered_list_to_html_node(block)
+
+        block_children.append(child_node)
+
+    # Return parent div containing all blocks
+    return ParentNode("div", block_children)
