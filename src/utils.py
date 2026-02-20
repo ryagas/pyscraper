@@ -1,5 +1,7 @@
 from enum import Enum
+import os
 import re
+import shutil
 from textnode import TextNode, TextType
 from htmlnode import LeafNode, ParentNode
 
@@ -11,6 +13,107 @@ class BlockType(Enum):
     QUOTE = "quote"
     UNORDERED_LIST = "unordered_list"
     ORDERED_LIST = "ordered_list"
+
+
+def generate_page(from_path, template_path, dest_path):
+    print(f"Generating page from {from_path} to {dest_path} using {template_path}")
+
+    # Read the markdown file
+    with open(from_path, "r", encoding="utf-8") as f:
+        markdown_content = f.read()
+
+    # Read the template file
+    with open(template_path, "r", encoding="utf-8") as f:
+        template_content = f.read()
+
+    html_text = markdown_to_html_node(markdown_content).to_html()
+
+    title = extract_title(markdown_content)
+
+    # Replace placeholders in template
+    final_html = template_content.replace("{{ Title }}", title)
+    final_html = final_html.replace("{{ Content }}", html_text)
+
+    # Create destination directory if it doesn't exist
+    dest_dir = os.path.dirname(dest_path)
+    if dest_dir:  # Only create if there's a directory component
+        os.makedirs(dest_dir, exist_ok=True)
+
+    # Write the final HTML to the destination file
+    with open(dest_path, "w", encoding="utf-8") as f:
+        f.write(final_html)
+
+    pass
+
+
+def extract_title(markdown):
+    """
+    Extract the h1 header from a markdown document.
+
+    Args:
+        markdown: String containing markdown document
+
+    Returns:
+        String containing the h1 header text (without the # prefix)
+
+    Raises:
+        Exception: If no h1 header is found in the markdown
+    """
+    # Split markdown into blocks
+    blocks = markdown_to_blocks(markdown)
+
+    # Search for h1 header (line starting with single # followed by space)
+    for block in blocks:
+        # Check if block starts with exactly one # followed by a space
+        if re.match(r"^# ", block):
+            # Extract the title text (remove "# " prefix)
+            return strip_heading_prefix(block)
+
+    # If no h1 found, raise exception
+    raise Exception("No h1 header found in markdown")
+
+
+def copy_directory_recursive(source_dir, dest_dir):
+    """
+    Recursively copy contents from source directory to destination directory.
+    The destination directory is emptied first, then all files are copied.
+
+    Args:
+        source_dir: Path to the source directory
+        dest_dir: Path to the destination directory
+    """
+    # Validate source directory exists
+    if not os.path.exists(source_dir):
+        raise FileNotFoundError(f"Source directory does not exist: {source_dir}")
+
+    # Empty destination directory if it exists
+    if os.path.exists(dest_dir):
+        shutil.rmtree(dest_dir)
+
+    # Create destination directory
+    os.makedirs(dest_dir)
+
+    # Recursively copy files
+    for root, dirs, files in os.walk(source_dir):
+        # Calculate relative path from source
+        rel_path = os.path.relpath(root, source_dir)
+
+        # Handle root directory case (when rel_path is ".")
+        if rel_path == ".":
+            dest_root = dest_dir
+        else:
+            dest_root = os.path.join(dest_dir, rel_path)
+
+        # Create subdirectories in destination
+        os.makedirs(dest_root, exist_ok=True)
+
+        # Copy each file
+        for file in files:
+            src_file = os.path.join(root, file)
+            dest_file = os.path.join(dest_root, file)
+
+            shutil.copy2(src_file, dest_file)
+            print(f"Copied: {dest_file}")
 
 
 def block_to_block_type(block):
@@ -203,6 +306,7 @@ def text_to_textnodes(text):
     nodes = split_nodes_delimiter(nodes, "**", TextType.BOLD)
     # italic
     nodes = split_nodes_delimiter(nodes, "*", TextType.ITALIC)
+    nodes = split_nodes_delimiter(nodes, "_", TextType.ITALIC)
     # images
     nodes = split_nodes_image(nodes)
     # lastly, links
