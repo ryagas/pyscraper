@@ -1,9 +1,8 @@
-from utils import copy_directory_recursive, generate_page
+from utils import generate_pages_recursive
 
 
 def main():
-    copy_directory_recursive("static", "public")
-    generate_page("content/index.md", "template.html", "public/index.html")
+    generate_pages_recursive("content", "template.html", "public")
 
 
 main()
